@@ -1,130 +1,61 @@
-FROM ubuntu:20.04
+# Use Kitware repo for newer CMake
+FROM --platform=linux/arm64 ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/London
 
-# Fix package dependencies first
-RUN apt update && \
-    apt install -y --fix-broken && \
-    apt install -y apt-utils && \
-    dpkg --configure -a
-
-# Install Python separately first to avoid dependency issues
-RUN apt update && \
-    apt install -y \
-    python3 \
-    python3-minimal \
-    python3-setuptools \
-    python3-wheel && \
-    dpkg --configure -a
-
-# Now install pip after setuptools is configured
-RUN apt install -y python3-pip && \
-    dpkg --configure -a
-
-# Install the rest of the packages in smaller groups
-RUN apt install -y \
-    sudo \
-    git \
-    curl \
-    nano \
-    wget \
-    build-essential \
-    brightnessctl && \
-    dpkg --configure -a
-
-RUN apt install -y \
-    autotools-dev \
-    automake \
-    libtool \
-    libtool-bin \
-    libevdev-dev \
-    libdrm-dev \
-    ninja-build \
-    libopenal-dev && \
-    dpkg --configure -a
-
-RUN apt install -y \
-    premake4 \
-    autoconf \
-    ffmpeg \
-    libsnappy-dev \
-    libboost-tools-dev \
-    magics++ \
-    libboost-thread-dev \
-    libboost-all-dev && \
-    dpkg --configure -a
-
-RUN apt install -y \
-    pkg-config \
-    zlib1g-dev \
-    libpng-dev \
-    libsdl2-dev \
-    libsdl1.2-dev \
-    clang && \
-    dpkg --configure -a
-
-RUN apt install -y \
-    libarchive13 \
-    libcurl4 \
-    libfreetype6-dev \
-    libjsoncpp-dev \
-    librhash0 \
-    libuv1 \
-    mercurial \
-    mercurial-common && \
-    dpkg --configure -a
-
-RUN apt install -y \
-    libgbm-dev \
-    libsdl2-ttf-dev \
-    libsdl2-image-dev \
-    libsdl2-mixer-dev \
-    libsdl-image1.2-dev \
-    libsdl-mixer1.2-dev \
-    libsdl-gfx1.2-dev && \
-    dpkg --configure -a
-
-# Final package cleanup
-RUN apt update && \
-    apt install -y --fix-broken && \
-    dpkg --configure -a && \
-    apt clean && \
+# Base utilities and Kitware repo
+RUN apt update && apt install -y --no-install-recommends \
+    ca-certificates gnupg wget && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor -o /usr/share/keyrings/kitware-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main" \
+      > /etc/apt/sources.list.d/kitware.list && \
+    apt update && apt install -y --no-install-recommends cmake cmake-data && \
     rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/include/libdrm/ /usr/include/drm
+# Build dependencies
+RUN apt update && apt install -y --no-install-recommends \
+    build-essential git wget curl python3 python3-pip pkg-config ninja-build clang \
+    automake autoconf libtool \
+    libudev-dev libdbus-1-dev libx11-dev libxext-dev libxrandr-dev libxfixes-dev libxi-dev libxcursor-dev \
+    libxinerama-dev libgles2-mesa-dev libegl1-mesa-dev libdrm-dev libgbm-dev \
+    libasound2-dev libpulse-dev libfreetype6-dev libpng-dev zlib1g-dev \
+    libopenal-dev libsnappy-dev libjsoncpp-dev ffmpeg libboost-all-dev \
+    mercurial && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install meson using ensurepip to avoid system conflicts
-RUN python3 -m pip install --upgrade pip && \
-    pip install cmake  && \
-    pip install meson
+# Python tools
+RUN pip install --no-cache-dir meson ninja
 
-# Install libsdl1.2
+# --- Build SDL2 from source ---
+WORKDIR /root
+RUN wget https://github.com/libsdl-org/SDL/releases/download/release-2.26.2/SDL2-2.26.2.tar.gz && \
+    tar -xzf SDL2-2.26.2.tar.gz && cd SDL2-2.26.2 && \
+    ./configure --prefix=/usr \
+        --disable-wayland --disable-wayland-shared \
+        --enable-video-x11 --enable-video-kmsdrm \
+        --disable-video-vivante --disable-video-opengles --disable-video-opengles1 --disable-video-opengles2 && \
+    make -j2 && make install && ldconfig && \
+    cd /root && rm -rf SDL2-2.26.2 SDL2-2.26.2.tar.gz
+
+# --- Build sdl12-compat ---
 WORKDIR /root
 RUN git clone https://github.com/libsdl-org/sdl12-compat.git && \
-    cd sdl12-compat && \
-    mkdir build && cd build && \
-    cmake .. -DSDL12TESTS=OFF && \
-    make -j$(nproc)
+    cd sdl12-compat && mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release && \
+    make -j2 && make install && \
+    ldconfig && \
+    cd /root && rm -rf sdl12-compat
 
-
-# Install SDL2 for arm64
-WORKDIR /root
-RUN wget https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.26.2.tar.gz && \
-    tar -xzf release-2.26.2.tar.gz && \
-    cd SDL-release-2.26.2 && \
-    ./configure --prefix=/usr && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig
-
-# Install gl4es
+# --- Build gl4es ---
 WORKDIR /root
 RUN git clone https://github.com/ptitSeb/gl4es.git && \
-    cd gl4es && \
-    mkdir build && cd build && \
-    cmake .. -DSDL12TESTS=OFF -DNOX11=ON -DGLX_STUBS=ON -DEGL_WRAPPER=ON -DGBM=ON && \
-    make
+    cd gl4es && mkdir build && cd build && \
+    cmake .. -DNOX11=ON -DGLX_STUBS=ON -DEGL_WRAPPER=ON -DGBM=ON -DWAYLAND=OFF -DCMAKE_BUILD_TYPE=Release && \
+    make -j2 && make install && \
+    cd /root && rm -rf gl4es
 
 # Final cleanup
-RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/sdl12-compat /root/gl4es /root/SDL-release-2.26.2 /root/release-2.26.2.tar.gz
+RUN apt autoremove -y && apt clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+WORKDIR /workspace
