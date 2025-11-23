@@ -46,10 +46,13 @@ docker container start builder32
 docker container start builder64
 docker container start builderx86_64
 ```
+
 Copy the files
 
+```bash
 docker cp <containerId>:/file/path/within/container /host/path/target
 docker cp <Name>:/file/path/within/container /host/path/target
+```
 
 Example
 ```bash
