@@ -96,7 +96,7 @@ RUN ln -s /usr/include/libdrm/ /usr/include/drm
 
 # Install meson using ensurepip to avoid system conflicts
 RUN python3 -m pip install --upgrade pip && \
-    pip install cmake  && \
+    pip install cmake --upgrade cmake && \
     pip install meson
 
 # Install libsdl1.2
@@ -105,7 +105,7 @@ RUN git clone https://github.com/libsdl-org/sdl12-compat.git && \
     cd sdl12-compat && \
     mkdir build && cd build && \
     cmake .. -DSDL12TESTS=OFF && \
-    make -j$(nproc)
+    make -j2
 
 
 # Install SDL2 for arm64
@@ -114,7 +114,7 @@ RUN wget https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.26.2.tar.
     tar -xzf release-2.26.2.tar.gz && \
     cd SDL-release-2.26.2 && \
     ./configure --prefix=/usr && \
-    make -j$(nproc) && \
+    make -j2 && \
     make install && \
     ldconfig
 
