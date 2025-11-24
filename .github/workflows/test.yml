@@ -58,6 +58,26 @@ jobs:
           echo "Image size is acceptable"
         fi
 
+    - name: Save Docker image as tar file
+      run: |
+        docker save ubuntu20.04-arm:latest -o ubuntu20.04-arm-latest.tar
+        echo "Docker image saved as tar file"
+        ls -lh ubuntu20.04-arm-latest.tar
+
+    - name: Compress Docker image
+      run: |
+        echo "Compressing Docker image..."
+        gzip -v ubuntu20.04-arm-latest.tar
+        ls -lh ubuntu20.04-arm-latest.tar.gz
+
+    - name: Upload Docker image as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ubuntu20.04-arm-docker-image
+        path: ubuntu20.04-arm-latest.tar.gz
+        retention-days: 30
+        compression-level: 9
+
     - name: Move cache
       run: |
         rm -rf /tmp/.buildx-cache
