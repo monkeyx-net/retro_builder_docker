@@ -9,6 +9,7 @@ RUN apt update && \
         ca-certificates \
         curl \
         nano \
+        git \
         gnupg \
         wget \
         build-essential \
