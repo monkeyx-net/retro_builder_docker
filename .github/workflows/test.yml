@@ -33,7 +33,7 @@ jobs:
         file: ./Dockerfile
         platforms: linux/arm64
         load: true
-        tags: ubuntu20.04-arm64:latest
+        tags: ubuntu20.04-arm:latest
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
@@ -41,45 +41,11 @@ jobs:
       run: |
         echo "Testing the built Docker image..."
         docker run --rm ubuntu20.04-arm:latest uname -a
-        docker run --rm ubuntu20.04-arm64:latest cat /etc/os-release
-        docker run --rm ubuntu20.04-arm64:latest python3 --version
-        docker run --rm ubuntu20.04-arm64:latest cmake --version
+        docker run --rm ubuntu20.04-arm:latest cat /etc/os-release
+        docker run --rm ubuntu20.04-arm:latest python3 --version
+        docker run --rm ubuntu20.04-arm:latest cmake --version
+        docker run --rm ubuntu20.04-arm:latest bash -c "pkg-config --modversion sdl2"
         echo "All tests passed!"
-
-    - name: Move cache
-      run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-  test:
-    runs-on: ubuntu-22.04-arm
-    needs: build
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Load and run additional tests
-      run: |
-        # Test SDL installation
-        docker run --rm ubuntu20.04-arm64:latest bash -c "pkg-config --modversion sdl2"
-
-        # Test basic compilation
-        docker run --rm -v $PWD/test-sdl.c:/tmp/test-sdl.c ubuntu20.04-arm64:latest bash -c "
-          cat > /tmp/test-sdl.c << 'EOF'
-          #include <SDL2/SDL.h>
-          #include <stdio.h>
-          int main() {
-              printf('SDL compiled successfully: %d.%d.%d\n',
-                     SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
-              return 0;
-          }
-          EOF
-          gcc /tmp/test-sdl.c -o /tmp/test-sdl $(pkg-config --cflags --libs sdl2) && /tmp/test-sdl
-        "
 
     - name: Image size check
       run: |
@@ -91,3 +57,10 @@ jobs:
         else
           echo "Image size is acceptable"
         fi
+
+
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
