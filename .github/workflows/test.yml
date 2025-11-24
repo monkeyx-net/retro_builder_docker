@@ -52,7 +52,7 @@ jobs:
         mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
   test:
-    runs-on: ubuntu-22.04-arm64
+    runs-on: ubuntu-22.04-arm
     needs: build
 
     steps:
