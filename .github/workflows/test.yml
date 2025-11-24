@@ -36,6 +36,9 @@ jobs:
         tags: ubuntu20.04-arm:latest
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+        squash: true
+        build-args: |
+          DEBIAN_FRONTEND=noninteractive
 
     - name: Test built image
       run: |
