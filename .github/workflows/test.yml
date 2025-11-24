@@ -39,28 +39,39 @@ jobs:
         build-args: |
           DEBIAN_FRONTEND=noninteractive
 
-    - name: Squash Docker image
-      run: |
-        # Install dependencies
-        sudo apt-get update && sudo apt-get install -y bc
-        pip install docker-squash
+      - name: Squash Docker image manually
+        run: |
+          sudo apt-get update && sudo apt-get install -y bc
 
-        # Check available disk space before squashing
-        df -h
+          echo "Squashing Docker image using export/import method..."
 
-        # Squash using the correct syntax
-        echo "Squashing Docker image..."
-        docker-squash -f ubuntu20.04-arm:latest -t ubuntu20.04-arm:squashed
+          # Create a temporary container from the image
+          docker create --name temp-squash-container ubuntu20.04-arm:latest /bin/bash
 
-        # Replace the original image with the squashed one
-        docker rmi ubuntu20.04-arm:latest
-        docker tag ubuntu20.04-arm:squashed ubuntu20.04-arm:latest
-        docker rmi ubuntu20.04-arm:squashed
+          # Export the container filesystem and import as a new image
+          docker export temp-squash-container | docker import - ubuntu20.04-arm:squashed
 
-        # Verify the new size
-        SIZE=$(docker image inspect ubuntu20.04-arm:latest --format='{{.Size}}')
-        SIZE_GB=$(echo "scale=2; $SIZE / 1024 / 1024 / 1024" | bc)
-        echo "Squashed image size: ${SIZE_GB}GB"
+          # Remove the temporary container
+          docker rm temp-squash-container
+
+          # Get the original image's CMD/ENTRYPOINT and apply to squashed image
+          ORIG_CMD=$(docker image inspect ubuntu20.04-arm:latest --format='{{json .Config.Cmd}}')
+          ORIG_ENTRYPOINT=$(docker image inspect ubuntu20.04-arm:latest --format='{{json .Config.Entrypoint}}')
+
+          # Create a new image with the original metadata
+          docker build -t ubuntu20.04-arm:latest - << EOF
+          FROM ubuntu20.04-arm:squashed
+          ENTRYPOINT $ORIG_ENTRYPOINT
+          CMD $ORIG_CMD
+          EOF
+
+          # Clean up
+          docker rmi ubuntu20.04-arm:squashed
+
+          # Verify the new size
+          SIZE=$(docker image inspect ubuntu20.04-arm:latest --format='{{.Size}}')
+          SIZE_GB=$(echo "scale=2; $SIZE / 1024 / 1024 / 1024" | bc)
+          echo "Squashed image size: ${SIZE_GB}GB"
 
     - name: Test built image
       run: |
