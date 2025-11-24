@@ -56,7 +56,10 @@ RUN apt update && \
         libsdl-mixer1.2-dev \
         libsdl-gfx1.2-dev && \
     apt clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    find /usr/share/doc -depth -type f ! -name copyright -delete && \
+    find /usr/share/man -type f -delete
+
 
 # Add Kitware CMake repository
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
@@ -64,9 +67,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt update && \
     apt install -y cmake && \
     apt clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    find /usr/share/doc -depth -type f ! -name copyright -delete && \
-    find /usr/share/man -type f -delete
+    rm -rf /var/lib/apt/lists/*
 
 # Install SDL2 for arm64
 WORKDIR /root
