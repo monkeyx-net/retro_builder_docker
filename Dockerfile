@@ -1,10 +1,11 @@
 FROM ubuntu:20.04
 
-ARG DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/London
 
 # Update and install base packages in a single layer to reduce image size
 RUN apt update && \
+    apt upgrade -y && \
     apt install -y --no-install-recommends \
         ca-certificates \
         sudo \
@@ -16,9 +17,6 @@ RUN apt update && \
         build-essential \
         brightnessctl \
         python3 \
-        python3-pip \
-        python3-setuptools \
-        python3-wheel \
         autotools-dev \
         automake \
         libtool \
