@@ -17,10 +17,6 @@ RUN apt update && \
         libgbm-dev \
         libegl-dev \
         libgles2-mesa-dev \
-        libsdl2-dev \
-        libsdl2-ttf-dev \
-        libsdl2-image-dev \
-        libsdl2-mixer-dev \
         libfreetype6-dev \
         libopenal-dev \
         libjsoncpp-dev \
