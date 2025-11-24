@@ -68,7 +68,7 @@ jobs:
         docker run --rm ubuntu20.04-arm:latest bash -c "pkg-config --modversion sdl2"
 
         # Test basic compilation
-        docker run --rm -v $PWD/test-sdl.c:/tmp/test-sdl.c ubuntu20.04-arm:latest bash -c "
+        docker run --rm -v $PWD/test-sdl.c:/tmp/test-sdl.c ubuntu20.04-arm bash -c "
           cat > /tmp/test-sdl.c << 'EOF'
           #include <SDL2/SDL.h>
           #include <stdio.h>
