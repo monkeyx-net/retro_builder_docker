@@ -41,11 +41,21 @@ jobs:
 
     - name: Squash Docker image
       run: |
-        # Install docker-squash
+        # Install dependencies
+        sudo apt-get update && sudo apt-get install -y bc
         pip install docker-squash
 
-        # Squash the image
-        docker save ubuntu20.04-arm:latest | docker-squash -t ubuntu20.04-arm:latest | docker load
+        # Check available disk space before squashing
+        df -h
+
+        # Squash using the correct syntax
+        echo "Squashing Docker image..."
+        docker-squash -f ubuntu20.04-arm:latest -t ubuntu20.04-arm:squashed
+
+        # Replace the original image with the squashed one
+        docker rmi ubuntu20.04-arm:latest
+        docker tag ubuntu20.04-arm:squashed ubuntu20.04-arm:latest
+        docker rmi ubuntu20.04-arm:squashed
 
         # Verify the new size
         SIZE=$(docker image inspect ubuntu20.04-arm:latest --format='{{.Size}}')
