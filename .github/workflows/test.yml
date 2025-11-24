@@ -44,7 +44,7 @@ jobs:
         docker run --rm ubuntu20.04-arm:latest cat /etc/os-release
         docker run --rm ubuntu20.04-arm:latest python3 --version
         docker run --rm ubuntu20.04-arm:latest cmake --version
-        docker run --rm ubuntu20.04-arm:latest bash -c "pkg-config --modversion sdl2"
+        docker run --rm ubuntu20.04-arm:latest sdl2-config --version"
         echo "All tests passed!"
 
     - name: Image size check
