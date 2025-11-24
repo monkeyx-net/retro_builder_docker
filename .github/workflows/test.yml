@@ -36,9 +36,97 @@ jobs:
         tags: ubuntu20.04-arm:latest
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-        squash: true
         build-args: |
           DEBIAN_FRONTEND=noninteractive
+
+name: Build Ubuntu 20.04 Docker Image on ARM64
+
+on:
+  push:
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04-arm
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
+        platforms: linux/arm64
+
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/arm64
+        load: true
+        tags: ubuntu20.04-arm:latest
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+        build-args: |
+          DEBIAN_FRONTEND=noninteractive
+
+    - name: Test built image
+      run: |
+        echo "Testing the built Docker image..."
+        docker run --rm ubuntu20.04-arm:latest uname -a
+        docker run --rm ubuntu20.04-arm:latest cat /etc/os-release
+        docker run --rm ubuntu20.04-arm:latest python3 --version
+        docker run --rm ubuntu20.04-arm:latest cmake --version
+        echo "All tests passed!"
+
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+    - name: Test SDL installation
+      run: |
+        echo "Testing SDL installation..."
+        docker run --rm ubuntu20.04-arm:latest bash -c "pkg-config --modversion sdl2"
+
+    - name: Test SDL compilation
+      run: |
+        echo "Testing SDL compilation..."
+        docker run --rm ubuntu20.04-arm:latest bash -c "
+          cat > /tmp/test-sdl.c << 'EOF'
+          #include <SDL2/SDL.h>
+          #include <stdio.h>
+          int main() {
+              printf('SDL compiled successfully: %d.%d.%d\n',
+                     SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
+              return 0;
+          }
+          EOF
+          gcc /tmp/test-sdl.c -o /tmp/test-sdl \$(pkg-config --cflags --libs sdl2) && /tmp/test-sdl
+        "
+
+    - name: Image size check
+      run: |
+        SIZE=$(docker image inspect ubuntu20.04-arm:latest --format='{{.Size}}')
+        SIZE_GB=$(echo "scale=2; $SIZE / 1024 / 1024 / 1024" | bc)
+        echo "Image size: ${SIZE_GB}GB"
+        if (( $(echo "$SIZE_GB > 3" | bc -l) )); then
+          echo "Warning: Image size is larger than 3GB"
+          exit 1
+        else
+          echo "Image size is acceptable"
+        fi
+
 
     - name: Test built image
       run: |
