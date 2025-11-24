@@ -1,108 +1,94 @@
-FROM ubuntu:20.04
+# Build stage
+FROM ubuntu:20.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/London
 
-# Update and install base packages in a single layer to reduce image size
 RUN apt update && \
     apt install -y --no-install-recommends \
         ca-certificates \
         sudo \
         git \
         curl \
-        nano \
-        gnupg \
         wget \
         build-essential \
-        brightnessctl \
-        python3 \
-        autotools-dev \
         automake \
         libtool \
-        libtool-bin \
-        libevdev-dev \
-        libdrm-dev \
         ninja-build \
-        libopenal-dev \
-        premake4 \
         autoconf \
-        ffmpeg \
-        libsnappy-dev \
-        libboost-tools-dev \
-        magics++ \
-        libboost-thread-dev \
-        libboost-all-dev \
+        cmake \
         pkg-config \
         zlib1g-dev \
-        libpng-dev \
-        libsdl2-dev \
-        libsdl1.2-dev \
-        cmake \
-        clang \
-        libarchive13 \
-        libcurl4 \
-        libfreetype6-dev \
-        libjsoncpp-dev \
-        librhash0 \
-        libuv1 \
-        mercurial \
-        mercurial-common \
+        libevdev-dev \
+        libdrm-dev \
         libgbm-dev \
-        libsdl2-ttf-dev \
-        libsdl2-image-dev \
-        libsdl2-mixer-dev \
-        libsdl-image1.2-dev \
-        libsdl-mixer1.2-dev \
-        libsdl-gfx1.2-dev && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    find /usr/share/doc -depth -type f ! -name copyright -delete && \
-    find /usr/share/man -type f -delete
-
-
-# Add Kitware CMake repository
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-    echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ focal main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt update && \
-    apt install -y cmake && \
+        libopenal-dev && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install SDL2 for arm64
-WORKDIR /root
+# Build SDL2
+WORKDIR /tmp
 RUN wget https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.2.tar.gz && \
     tar -xzf release-2.30.2.tar.gz && \
     cd SDL-release-2.30.2 && \
     ./configure --prefix=/usr && \
     make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    rm -rf /root/SDL-release-2.30.2 /root/release-2.30.2.tar.gz
+    make install
 
-# Install libsdl1.2
-WORKDIR /root
+# Build sdl12-compat
 RUN git clone https://github.com/libsdl-org/sdl12-compat.git && \
     cd sdl12-compat && \
     mkdir build && cd build && \
     cmake .. -DSDL12TESTS=OFF && \
     make -j$(nproc) && \
-    make install && \
-    rm -rf /root/sdl12-compat
+    make install
 
-# Install gl4es
-WORKDIR /root
+# Build gl4es
 RUN git clone https://github.com/ptitSeb/gl4es.git && \
     cd gl4es && \
     mkdir build && cd build && \
     cmake .. -DSDL12TESTS=OFF -DNOX11=ON -DGLX_STUBS=ON -DEGL_WRAPPER=ON -DGBM=ON && \
     make -j$(nproc) && \
-    make install && \
-    rm -rf /root/gl4es
+    make install
 
-# Create symbolic link
-RUN ln -sf /usr/include/libdrm/ /usr/include/drm
+# Final stage
+FROM ubuntu:20.04
 
-# Final cleanup
-RUN apt autoremove -y && \
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/London
+
+# Install only runtime dependencies
+RUN apt update && \
+    apt install -y --no-install-recommends \
+        ca-certificates \
+        libevdev2 \
+        libdrm2 \
+        libgbm1 \
+        libopenal1 \
+        libsdl2-2.0-0 \
+        libsdl2-ttf-2.0-0 \
+        libsdl2-image-2.0-0 \
+        libsdl2-mixer-2.0-0 \
+        zlib1g \
+        libfreetype6 \
+        libjsoncpp1 \
+        libuv1 \
+        libarchive13 \
+        libcurl4 \
+        librhash0 \
+        ffmpeg \
+        libsnappy1v5 \
+        magics++ \
+        python3 && \
     apt clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    rm -rf /var/lib/apt/lists/* && \
+    find /usr/share/doc -depth -type f ! -name copyright -delete && \
+    find /usr/share/man -type f -delete
+
+# Copy built libraries from builder stage
+COPY --from=builder /usr/lib /usr/lib
+COPY --from=builder /usr/include /usr/include
+COPY --from=builder /usr/local /usr/local
+
+RUN ldconfig && \
+    ln -sf /usr/include/libdrm/ /usr/include/drm
