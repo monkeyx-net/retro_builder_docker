@@ -16,7 +16,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
       with:
         driver: docker-container
-        platforms: linux/arm64
+        platforms: linux/arm
 
     - name: Cache Docker layers
       uses: actions/cache@v3
@@ -31,19 +31,19 @@ jobs:
       with:
         context: .
         file: ./Dockerfile
-        platforms: linux/arm64
+        platforms: linux/arm
         load: true
-        tags: ubuntu20.04-arm64:latest
+        tags: ubuntu20.04-arm
         cache-from: type=local,src=/tmp/.buildx-cache
         cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
     - name: Test built image
       run: |
         echo "Testing the built Docker image..."
-        docker run --rm ubuntu20.04-arm64:latest uname -a
-        docker run --rm ubuntu20.04-arm64:latest cat /etc/os-release
-        docker run --rm ubuntu20.04-arm64:latest python3 --version
-        docker run --rm ubuntu20.04-arm64:latest cmake --version
+        docker run --rm ubuntu20.04-arm:latest uname -a
+        docker run --rm ubuntu20.04-arm:latest cat /etc/os-release
+        docker run --rm ubuntu20.04-arm:latest python3 --version
+        docker run --rm ubuntu20.04-arm:latest cmake --version
         echo "All tests passed!"
 
     - name: Move cache
@@ -65,10 +65,10 @@ jobs:
     - name: Load and run additional tests
       run: |
         # Test SDL installation
-        docker run --rm ubuntu20.04-arm64:latest bash -c "pkg-config --modversion sdl2"
+        docker run --rm ubuntu20.04-arm:latest bash -c "pkg-config --modversion sdl2"
 
         # Test basic compilation
-        docker run --rm -v $PWD/test-sdl.c:/tmp/test-sdl.c ubuntu20.04-arm64:latest bash -c "
+        docker run --rm -v $PWD/test-sdl.c:/tmp/test-sdl.c ubuntu20.04-arm:latest bash -c "
           cat > /tmp/test-sdl.c << 'EOF'
           #include <SDL2/SDL.h>
           #include <stdio.h>
@@ -83,7 +83,7 @@ jobs:
 
     - name: Image size check
       run: |
-        SIZE=$(docker image inspect ubuntu20.04-arm64:latest --format='{{.Size}}')
+        SIZE=$(docker image inspect ubuntu20.04-arm:latest --format='{{.Size}}')
         SIZE_GB=$(echo "scale=2; $SIZE / 1024 / 1024 / 1024" | bc)
         echo "Image size: ${SIZE_GB}GB"
         if (( $(echo "$SIZE_GB > 3" | bc -l) )); then
