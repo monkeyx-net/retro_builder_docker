@@ -1,108 +1,93 @@
-FROM ubuntu:20.04
+name: Build Ubuntu 20.04 Docker Image on ARM64
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Europe/London
+on:
+  push:
+  workflow_dispatch:  # Allow manual triggering
 
-# Update and install base packages in a single layer to reduce image size
-RUN apt update && \
-    apt install -y --no-install-recommends \
-        ca-certificates \
-        sudo \
-        git \
-        curl \
-        nano \
-        gnupg \
-        wget \
-        build-essential \
-        brightnessctl \
-        python3 \
-        autotools-dev \
-        automake \
-        libtool \
-        libtool-bin \
-        libevdev-dev \
-        libdrm-dev \
-        ninja-build \
-        libopenal-dev \
-        premake4 \
-        autoconf \
-        ffmpeg \
-        libsnappy-dev \
-        libboost-tools-dev \
-        magics++ \
-        libboost-thread-dev \
-        libboost-all-dev \
-        pkg-config \
-        zlib1g-dev \
-        libpng-dev \
-        libsdl2-dev \
-        libsdl1.2-dev \
-        cmake \
-        clang \
-        libarchive13 \
-        libcurl4 \
-        libfreetype6-dev \
-        libjsoncpp-dev \
-        librhash0 \
-        libuv1 \
-        mercurial \
-        mercurial-common \
-        libgbm-dev \
-        libsdl2-ttf-dev \
-        libsdl2-image-dev \
-        libsdl2-mixer-dev \
-        libsdl-image1.2-dev \
-        libsdl-mixer1.2-dev \
-        libsdl-gfx1.2-dev && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
-    find /usr/share/doc -depth -type f ! -name copyright -delete && \
-    find /usr/share/man -type f -delete
+jobs:
+  build:
+    runs-on: ubuntu-22.04-arm
 
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-# Add Kitware CMake repository
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
-    echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ focal main' | tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
-    apt update && \
-    apt install -y cmake && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver: docker-container
+        platforms: linux/arm64
 
-# Install SDL2 for arm64
-WORKDIR /root
-RUN wget https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.2.tar.gz && \
-    tar -xzf release-2.30.2.tar.gz && \
-    cd SDL-release-2.30.2 && \
-    ./configure --prefix=/usr && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig && \
-    rm -rf /root/SDL-release-2.30.2 /root/release-2.30.2.tar.gz
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
 
-# Install libsdl1.2
-WORKDIR /root
-RUN git clone https://github.com/libsdl-org/sdl12-compat.git && \
-    cd sdl12-compat && \
-    mkdir build && cd build && \
-    cmake .. -DSDL12TESTS=OFF && \
-    make -j$(nproc) && \
-    make install && \
-    rm -rf /root/sdl12-compat
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/arm64
+        load: true
+        tags: ubuntu20.04-arm64:latest
+        cache-from: type=local,src=/tmp/.buildx-cache
+        cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
-# Install gl4es
-WORKDIR /root
-RUN git clone https://github.com/ptitSeb/gl4es.git && \
-    cd gl4es && \
-    mkdir build && cd build && \
-    cmake .. -DSDL12TESTS=OFF -DNOX11=ON -DGLX_STUBS=ON -DEGL_WRAPPER=ON -DGBM=ON && \
-    make -j$(nproc) && \
-    make install && \
-    rm -rf /root/gl4es
+    - name: Test built image
+      run: |
+        echo "Testing the built Docker image..."
+        docker run --rm ubuntu20.04-arm:latest uname -a
+        docker run --rm ubuntu20.04-arm64:latest cat /etc/os-release
+        docker run --rm ubuntu20.04-arm64:latest python3 --version
+        docker run --rm ubuntu20.04-arm64:latest cmake --version
+        echo "All tests passed!"
 
-# Create symbolic link
-RUN ln -sf /usr/include/libdrm/ /usr/include/drm
+    - name: Move cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-# Final cleanup
-RUN apt autoremove -y && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+  test:
+    runs-on: ubuntu-22.04-arm
+    needs: build
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Load and run additional tests
+      run: |
+        # Test SDL installation
+        docker run --rm ubuntu20.04-arm64:latest bash -c "pkg-config --modversion sdl2"
+
+        # Test basic compilation
+        docker run --rm -v $PWD/test-sdl.c:/tmp/test-sdl.c ubuntu20.04-arm64:latest bash -c "
+          cat > /tmp/test-sdl.c << 'EOF'
+          #include <SDL2/SDL.h>
+          #include <stdio.h>
+          int main() {
+              printf('SDL compiled successfully: %d.%d.%d\n',
+                     SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
+              return 0;
+          }
+          EOF
+          gcc /tmp/test-sdl.c -o /tmp/test-sdl $(pkg-config --cflags --libs sdl2) && /tmp/test-sdl
+        "
+
+    - name: Image size check
+      run: |
+        SIZE=$(docker image inspect ubuntu20.04-arm64:latest --format='{{.Size}}')
+        SIZE_GB=$(echo "scale=2; $SIZE / 1024 / 1024 / 1024" | bc)
+        echo "Image size: ${SIZE_GB}GB"
+        if (( $(echo "$SIZE_GB > 3" | bc -l) )); then
+          echo "Warning: Image size is larger than 3GB"
+        else
+          echo "Image size is acceptable"
+        fi

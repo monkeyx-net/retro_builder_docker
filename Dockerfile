@@ -9,7 +9,6 @@ RUN apt update && \
         git \
         wget \
         build-essential \
-        cmake \
         pkg-config \
         zlib1g-dev \
         libevdev-dev \
@@ -17,6 +16,9 @@ RUN apt update && \
         libgbm-dev \
         libegl-dev \
         libgles2-mesa-dev \
+        libsdl2-ttf-dev \
+        libsdl2-image-dev \
+        libsdl2-mixer-dev \
         libfreetype6-dev \
         libopenal-dev \
         libjsoncpp-dev \
