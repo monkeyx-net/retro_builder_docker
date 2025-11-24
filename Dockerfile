@@ -39,7 +39,6 @@ RUN apt update && \
         libsdl2-dev \
         libsdl1.2-dev \
         cmake \
-        golang-go \
         clang \
         libarchive13 \
         libcurl4 \
@@ -65,7 +64,9 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt update && \
     apt install -y cmake && \
     apt clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    find /usr/share/doc -depth -type f ! -name copyright -delete && \
+    find /usr/share/man -type f -delete
 
 # Install SDL2 for arm64
 WORKDIR /root
