@@ -5,7 +5,6 @@ ENV TZ=Europe/London
 
 # Update and install base packages in a single layer to reduce image size
 RUN apt update && \
-    apt upgrade -y && \
     apt install -y --no-install-recommends \
         ca-certificates \
         sudo \
